@@ -1,0 +1,102 @@
+{
+  "center_lat": 26.334342457585535,
+  "center_lon": 86.66914077021599,
+  "total_flood_area_km2": 26.3,
+  "flooded_road_segments": 24,
+  "total_road_segments": 3219,
+  "estimated_affected_population": 11837,
+  "affected_zones": [
+    {
+      "name": "Gobargadha Island Community",
+      "lat": 26.334342457585535,
+      "lon": 86.66914077021599,
+      "local_flood_km2": 3.05,
+      "est_population": 3992,
+      "status": "CRITICAL / ISOLATED",
+      "staging_node": 6631617992,
+      "staging_lat": 26.348246,
+      "staging_lon": 86.6588232
+    },
+    {
+      "name": "Saptari Western Embankment Zone",
+      "lat": 26.458534317020057,
+      "lon": 86.85757650441084,
+      "local_flood_km2": 1.48,
+      "est_population": 3378,
+      "status": "HIGH RISK / ACCESS LIMITED",
+      "staging_node": 5207825280,
+      "staging_lat": 26.43858,
+      "staging_lon": 86.7876902
+    },
+    {
+      "name": "Tilathi Koiladi Floodplain Village",
+      "lat": 26.26653221625651,
+      "lon": 86.59047545144941,
+      "local_flood_km2": 1.89,
+      "est_population": 3366,
+      "status": "HIGH RISK / ACCESS LIMITED",
+      "staging_node": 14157488140,
+      "staging_lat": 26.2728161,
+      "staging_lon": 86.5579149
+    },
+    {
+      "name": "Hanumannagar Kankalini Sector",
+      "lat": 26.280580733957787,
+      "lon": 86.6228930549303,
+      "local_flood_km2": 1.8,
+      "est_population": 3110,
+      "status": "CRITICAL / ISOLATED",
+      "staging_node": 1779215112,
+      "staging_lat": 26.3137901,
+      "staging_lon": 86.6149658
+    },
+    {
+      "name": "Rajbiraj Southern Agricultural Belt",
+      "lat": 26.257778828612857,
+      "lon": 86.6245815239252,
+      "local_flood_km2": 0.86,
+      "est_population": 2671,
+      "status": "HIGH RISK / ACCESS LIMITED",
+      "staging_node": 1811598567,
+      "staging_lat": 26.3012991,
+      "staging_lon": 86.5752843
+    }
+  ],
+  "rescue_hubs": [
+    {
+      "name": "Shree Baba Dihabar Rescue Shelter",
+      "type": "School / Shelter",
+      "node": 6819952643,
+      "lat": 26.4419638,
+      "lon": 86.6615566
+    },
+    {
+      "name": "Rajbiraj District Emergency Hospital",
+      "type": "Hospital",
+      "node": 6635451335,
+      "lat": 26.4320231,
+      "lon": 86.7689748
+    },
+    {
+      "name": "Saptari North-West Civil Defense Base",
+      "type": "Command Base",
+      "node": 6812430316,
+      "lat": 26.4413928,
+      "lon": 86.5543567
+    },
+    {
+      "name": "Western Highway Logistics Depot",
+      "type": "Supply Hub",
+      "node": 6831746722,
+      "lat": 26.3351528,
+      "lon": 86.5488832
+    },
+    {
+      "name": "Central Koshi High-Ground Medical Post",
+      "type": "Clinic / Triage",
+      "node": 6815428391,
+      "lat": 26.3806113,
+      "lon": 86.6694557
+    }
+  ]
+}
