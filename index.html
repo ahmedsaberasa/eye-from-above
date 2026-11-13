@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eye from Above — Satellite Flood Rescue Intelligence</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts: Inter & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+  <!-- Leaflet.js for Real Satellite View Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <style>
+    :root {
+      --bg-canvas: #0b1120;
+      --bg-surface: #131c2e;
+      --bg-elevated: #1a253b;
+      --border-subtle: #24324a;
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --water-deep: #2563eb;
+      --water-shallow: #38bdf8;
+      --route-safe: #16a34a;
+      --danger-red: #dc2626;
+      --staging-amber: #d97706;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+      max-height: 100vh;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    h1, h2, h3, .font-display {
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    /* Smooth Manual Slide Stage & Cinematic Transitions (Strict 100vh Fit) */
+    .stage-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translateX(36px) scale(0.985);
+      transition:
+        opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+        visibility 0.65s;
+    }
+
+    .slide.prev-exit {
+      transform: translateX(-36px) scale(0.985);
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transform: translateX(0) scale(1);
+    }
+
+    /* Staggered Entrance for Right-Side Story Cards */
+    .slide.active .stagger-1 { animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both; }
+    .slide.active .stagger-2 { animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both; }
+    .slide.active .stagger-3 { animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.28s both; }
+    .slide.active .stagger-4 { animation: cardRise 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.38s both; }
+
+    @keyframes cardRise {
+      from { opacity: 0; transform: translateY(14px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Realistic Drifting Monsoon Clouds on Slide 1 */
+    @keyframes cloudDriftSlow {
+      0% { transform: translateX(-4%) translateY(0px); }
+      50% { transform: translateX(4%) translateY(-5px); }
+      100% { transform: translateX(-4%) translateY(0px); }
+    }
+    @keyframes cloudDriftAlt {
+      0% { transform: translateX(5%) translateY(3px); }
+      50% { transform: translateX(-5%) translateY(-4px); }
+      100% { transform: translateX(5%) translateY(3px); }
+    }
+    .cloud-layer-a { animation: cloudDriftSlow 13s ease-in-out infinite; }
+    .cloud-layer-b { animation: cloudDriftAlt 16s ease-in-out infinite; }
+
+    /* Leaflet Custom Dark UI & Marker Styling */
+    .leaflet-container {
+      background: #090e1a !important;
+      font-family: 'Inter', sans-serif !important;
+    }
+    .leaflet-control-attribution {
+      background: rgba(11, 17, 32, 0.8) !important;
+      color: #94a3b8 !important;
+      font-size: 10px !important;
+      border-top-left-radius: 8px;
+    }
+    .leaflet-control-attribution a { color: #38bdf8 !important; }
+    .leaflet-control-zoom a {
+      background-color: #131c2e !important;
+      color: #f1f5f9 !important;
+      border-color: #24324a !important;
+    }
+    .leaflet-control-zoom a:hover {
+      background-color: #1e293b !important;
+    }
+
+    /* Custom Dark Tooltip on Satellite Map */
+    .tactical-tooltip {
+      background: rgba(15, 23, 42, 0.95) !important;
+      border: 1px solid #334155 !important;
+      color: #f1f5f9 !important;
+      border-radius: 10px !important;
+      padding: 8px 12px !important;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.55) !important;
+      font-size: 12px !important;
+      line-height: 1.45 !important;
+    }
+    .tactical-tooltip::before {
+      border-top-color: #334155 !important;
+    }
+
+    /* Pulsing Map Pins */
+    .pin-pulse-red {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin-pulse-red::after {
+      content: '';
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 2px solid #dc2626;
+      animation: pinRipple 2s ease-out infinite;
+    }
+    .pin-pulse-amber {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pin-pulse-amber::after {
+      content: '';
+      position: absolute;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid #d97706;
+      animation: pinRipple 1.8s ease-out infinite;
+    }
+    @keyframes pinRipple {
+      0% { transform: scale(0.65); opacity: 0.95; }
+      100% { transform: scale(1.75); opacity: 0; }
+    }
+
+    /* Slide 4 Candidate Base Card Flip / Cycle Highlight */
+    .base-card-item {
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.35s ease, background-color 0.35s ease, box-shadow 0.35s ease;
+    }
+    .base-card-evaluating {
+      transform: scale(1.018) translateX(4px);
+      border-color: #38bdf8 !important;
+      background-color: rgba(14, 116, 144, 0.22) !important;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+    }
+    .base-card-winner {
+      transform: scale(1.02);
+      border-color: #16a34a !important;
+      background-color: rgba(20, 83, 45, 0.38) !important;
+      box-shadow: 0 6px 20px rgba(22, 163, 74, 0.22);
+    }
+
+    /* Natural Range Slider */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #1e293b;
+      height: 8px;
+      border-radius: 999px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #d97706;
+      border: 3px solid #f1f5f9;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Prominent Next Button Subtle 5-Second Glow Pulse */
+    @keyframes nextPulse {
+      0%, 72%, 100% {
+        box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+        transform: scale(1);
+      }
+      82% {
+        box-shadow: 0 0 0 8px rgba(56, 189, 248, 0.38), 0 0 18px rgba(56, 189, 248, 0.55);
+        transform: scale(1.04);
+      }
+      92% {
+        box-shadow: 0 0 0 12px rgba(56, 189, 248, 0);
+        transform: scale(1);
+      }
+    }
+    .next-btn-pulse:not(:disabled) {
+      animation: nextPulse 5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="h-screen max-h-screen overflow-hidden flex flex-col justify-between bg-[#0b1120] text-[#f1f5f9]">
+
+  <!-- TOP HEADER BAR -->
+  <header class="shrink-0 w-full px-5 sm:px-8 py-2.5 bg-[#131c2e]/95 border-b border-[#24324a] backdrop-blur-md flex flex-wrap items-center justify-between gap-3 z-30">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-xl bg-sky-500/15 border border-sky-400/30 flex items-center justify-center text-sky-400">
+        <i class="fa-solid fa-satellite text-sm"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2.5">
+          <span class="font-display font-extrabold tracking-wide text-white text-sm sm:text-base">EYE FROM ABOVE</span>
+          <span class="px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded-full bg-slate-800 text-sky-300 border border-slate-700">
+            NASA NISAR L-Band Radar
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden sm:block">2026 NASA Space Apps Challenge • Dancing with the SARs</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span class="hidden md:inline-flex items-center gap-1.5 text-xs text-slate-400">
+        <i class="fa-solid fa-hand-pointer text-amber-400"></i> Manual Slide Navigation • Auto-Demo Inside Each Slide
+      </span>
+      <span id="slideCounterBadge" class="px-3 py-1 rounded-xl bg-[#0b1120] border border-[#24324a] text-xs font-bold text-slate-200 tracking-wide">
+        SLIDE 1 / 7
+      </span>
+    </div>
+  </header>
+
+  <!-- MAIN PRESENTATION STAGE (FITS STRICTLY INSIDE REMAINING 100VH) -->
+  <main class="flex-1 min-h-0 w-full max-w-[1440px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-center overflow-hidden">
+    <div class="stage-wrapper">
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 1: THE CORE PROBLEM — SATELLITE VIEW BLINDED BY STORM CLOUDS   -->
+      <!-- =================================================================== -->
+      <section id="slide-1" class="slide active w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left Interactive Satellite Viewport (58%) -->
+        <div class="w-full lg:w-[58%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl">
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300">
+                Esri Satellite View • Koshi River Basin, Nepal (26.35° N, 86.65° E)
+              </span>
+            </div>
+            <button id="cloudPeekBtn" onclick="toggleSlide1Clouds()" class="px-3 py-1 rounded-xl bg-[#1a253b] hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-sky-300 transition cursor-pointer">
+              <i class="fa-solid fa-eye mr-1.5"></i><span>Peek Under Storm Clouds</span>
+            </button>
+          </div>
+
+          <!-- Real Satellite Map with Drifting Monsoon Clouds Overlay -->
+          <div id="slide1MapContainer" onmouseenter="peekCloudsHover(true)" onmouseleave="peekCloudsHover(false)" class="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden border border-[#24324a]">
+            <div id="mapSlide1" class="w-full h-full z-0"></div>
+
+            <!-- Realistic Storm Clouds Cover Overlay (Auto-dissipates after 1.6s) -->
+            <div id="stormCloudsOverlay" class="absolute inset-0 z-10 pointer-events-none transition-opacity duration-1000" style="background: radial-gradient(circle at 50% 45%, rgba(226,232,240,0.9) 0%, rgba(148,163,184,0.94) 60%, rgba(100,116,139,0.96) 100%);">
+              <svg viewBox="0 0 800 420" class="w-full h-full opacity-90">
+                <defs>
+                  <filter id="naturalCloudBlur" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="18" />
+                  </filter>
+                </defs>
+                <g class="cloud-layer-a" filter="url(#naturalCloudBlur)">
+                  <ellipse cx="230" cy="140" rx="220" ry="110" fill="#f8fafc" />
+                  <ellipse cx="520" cy="180" rx="250" ry="125" fill="#e2e8f0" />
+                  <ellipse cx="380" cy="300" rx="270" ry="120" fill="#cbd5e1" />
+                </g>
+                <g class="cloud-layer-b" filter="url(#naturalCloudBlur)">
+                  <ellipse cx="180" cy="270" rx="200" ry="95" fill="#f1f5f9" />
+                  <ellipse cx="600" cy="280" rx="210" ry="105" fill="#cbd5e1" />
+                </g>
+              </svg>
+            </div>
+
+            <!-- Optical Satellite Blinded Status Card -->
+            <div id="opticalBlindCard" class="absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-opacity duration-700">
+              <div class="px-5 py-3.5 rounded-2xl bg-[#0b1120]/90 border border-red-500/70 backdrop-blur-md text-center shadow-2xl max-w-sm mx-4">
+                <div class="w-9 h-9 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-1.5 text-base">
+                  <i class="fa-solid fa-cloud-showers-heavy"></i>
+                </div>
+                <div class="font-display font-bold text-base text-white">Optical Cameras Are Blinded</div>
+                <p class="text-xs text-slate-300 mt-1">
+                  Monsoon storm clouds hide flooded villages. <strong>NASA NISAR radar</strong> pierces through automatically...
+                </p>
+              </div>
+            </div>
+
+            <!-- Radar Pierced Badge (Revealed after 1.6s) -->
+            <div id="radarPiercedBadge" class="opacity-0 transition-opacity duration-700 absolute top-3 left-3 z-20 px-3 py-1.5 rounded-xl bg-[#0b1120]/90 border border-sky-400/60 text-xs font-bold text-sky-300 backdrop-blur-md pointer-events-none">
+              <i class="fa-solid fa-satellite-dish mr-1.5 text-sky-400"></i>Clouds Penetrated: Flooded Villages Revealed
+            </div>
+          </div>
+
+          <div class="shrink-0 grid grid-cols-3 gap-2.5 mt-2.5 text-center">
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-[10px] text-slate-400 uppercase">Disaster Zone</div>
+              <div class="text-xs font-bold text-slate-100">Koshi Basin, Nepal</div>
+            </div>
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-[10px] text-slate-400 uppercase">Normal Satellites</div>
+              <div class="text-xs font-bold text-red-400">Blocked by Clouds</div>
+            </div>
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-[10px] text-slate-400 uppercase">Eye from Above</div>
+              <div class="text-xs font-bold text-sky-400">Sees Through Storms</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Storytelling Panel (42%) -->
+        <div class="w-full lg:w-[42%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center">
+            <span class="self-start inline-block px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+              01 • The Core Problem
+            </span>
+            <h1 class="text-lg sm:text-xl xl:text-2xl font-extrabold text-white leading-snug mb-2">
+              During Monsoon Floods, Thick Clouds Blind Rescue Teams.
+            </h1>
+            <p class="text-slate-300 text-xs leading-relaxed mb-2.5">
+              When severe floods hit South Asia (like Nepal's Koshi River Basin), thick storm clouds block normal camera satellites for days. Rescue teams have no idea which villages are trapped underwater or which roads are washed away.
+            </p>
+
+            <div class="space-y-2">
+              <div class="stagger-1 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-sky-500">
+                <h3 class="text-xs sm:text-sm font-bold text-sky-300 mb-0.5"><i class="fa-solid fa-satellite-dish mr-1.5"></i>1. X-Ray Vision With NASA Radar</h3>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Uses <strong>NASA NISAR L-Band Radar (~24 cm wavelength)</strong> to pierce straight through thick rain clouds day and night without needing sunlight.</p>
+              </div>
+              <div class="stagger-2 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-emerald-500">
+                <h3 class="text-xs sm:text-sm font-bold text-emerald-300 mb-0.5"><i class="fa-solid fa-route mr-1.5"></i>2. Safe Dry Roads &amp; Vehicle Staging</h3>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Detects submerged highways, shows exactly where rescue trucks can drive safely on dry ground, and marks where motorboats must launch.</p>
+              </div>
+              <div class="stagger-3 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-amber-500">
+                <h3 class="text-xs sm:text-sm font-bold text-amber-300 mb-0.5"><i class="fa-solid fa-boxes-packing mr-1.5"></i>3. Food, Water &amp; Offline Phone Maps</h3>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Automatically calculates 72-hour survival rations (water, meals, tents, boats) and packages offline maps when cell towers collapse.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 2: HOW NASA NISAR RADAR WORKS (BEFORE VS. PEAK FLOOD SLIDER)  -->
+      <!-- =================================================================== -->
+      <section id="slide-2" class="slide w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left Interactive Radar Comparator (58%) -->
+        <div class="w-full lg:w-[58%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl">
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-sky-400">
+              <i class="fa-solid fa-wave-square mr-1.5"></i> Satellite View + NASA NISAR L-Band Backscatter
+            </span>
+            <span class="text-[11px] text-slate-300">Auto-sweeps after 2.7s • Or drag slider manually</span>
+          </div>
+
+          <!-- Split-Screen Esri Satellite + Radar Backscatter Comparator -->
+          <div class="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden border border-[#24324a] bg-[#090e1a]">
+            <!-- Real Esri Satellite Base Map for Koshi River Basin -->
+            <div id="mapSlide2" class="w-full h-full z-0"></div>
+
+            <!-- AFTER FLOOD OVERLAY (August 31, 2026 - Dark Specular Reflection Zones) -->
+            <svg viewBox="0 0 700 315" preserveAspectRatio="none" class="absolute inset-0 w-full h-full z-10 pointer-events-none">
+              <!-- Dark SAR Specular Floodwater Mask over Satellite Terrain -->
+              <path d="M 435 0 Q 375 85 320 145 Q 215 175 210 245 Q 245 300 345 290 Q 415 270 450 205 L 515 0 Z" fill="#030712" fill-opacity="0.82" stroke="#38bdf8" stroke-width="2" stroke-dasharray="6 3" />
+              <path d="M 285 190 Q 255 220 275 255 Q 335 265 375 225 Q 385 185 330 180 Z" fill="#020617" fill-opacity="0.92" stroke="#2563eb" stroke-width="1.5" />
+
+              <rect x="478" y="14" width="206" height="30" rx="8" fill="#0b1120" fill-opacity="0.92" stroke="#d97706" />
+              <text x="581" y="33" text-anchor="middle" fill="#fbbf24" font-size="11.5" font-weight="700">AUG 31: PEAK FLOOD</text>
+
+              <rect x="232" y="206" width="206" height="44" rx="8" fill="#0b1120" fill-opacity="0.82" stroke="#38bdf8" stroke-opacity="0.5" />
+              <text x="335" y="224" text-anchor="middle" fill="#38bdf8" font-size="11.5" font-weight="700">DARK WATER (&lt; -17.5 dB)</text>
+              <text x="335" y="240" text-anchor="middle" fill="#cbd5e1" font-size="10">Smooth water acts like a mirror</text>
+            </svg>
+
+            <!-- BEFORE FLOOD OVERLAY (August 19, 2026 - Clipped Dry Baseline) -->
+            <div id="radarClipLayer" class="absolute inset-0 overflow-hidden z-20 pointer-events-none" style="width: 80%;">
+              <svg viewBox="0 0 700 315" preserveAspectRatio="none" class="w-full h-full">
+                <!-- Subtle Radar Backscatter Tint over Dry Satellite Ground -->
+                <rect width="700" height="315" fill="#94a3b8" fill-opacity="0.16" />
+                <!-- Normal Baseline River Channel -->
+                <path d="M 455 0 Q 415 110 385 190 T 310 315 L 340 315 Q 410 190 440 110 T 485 0 Z" fill="#0f172a" fill-opacity="0.72" stroke="#38bdf8" stroke-width="1" />
+                <rect x="16" y="14" width="204" height="30" rx="8" fill="#0b1120" fill-opacity="0.92" stroke="#38bdf8" />
+                <text x="118" y="33" text-anchor="middle" fill="#38bdf8" font-size="11.5" font-weight="700">AUG 19: BEFORE FLOOD</text>
+                <rect x="132" y="156" width="206" height="44" rx="8" fill="#0b1120" fill-opacity="0.82" stroke="#16a34a" stroke-opacity="0.6" />
+                <text x="235" y="175" text-anchor="middle" fill="#f8fafc" font-size="11.5" font-weight="700">DRY ROUGH LAND</text>
+                <text x="235" y="191" text-anchor="middle" fill="#e2e8f0" font-size="10">Scatters radar signal back = Bright</text>
+              </svg>
+            </div>
+
+            <!-- Divider Handle -->
+            <div id="radarHandleBar" class="absolute top-0 bottom-0 w-0.5 bg-amber-400 z-30 pointer-events-none" style="left: 80%;">
+              <div class="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg border-2 border-white">
+                <i class="fa-solid fa-left-right text-xs"></i>
+              </div>
+            </div>
+          </div>
+
+          <!-- Slider Control -->
+          <div class="shrink-0 mt-2.5 flex items-center gap-3 bg-[#0b1120] px-4 py-2 rounded-xl border border-[#24324a]">
+            <span class="text-xs font-semibold text-sky-400 whitespace-nowrap">Aug 19 (Before)</span>
+            <input id="radarRangeInput" type="range" min="5" max="95" value="80" oninput="stopRadarAutoAnim(); moveRadarDivider(this.value)" class="w-full" />
+            <span class="text-xs font-semibold text-amber-400 whitespace-nowrap">Aug 31 (Peak Flood)</span>
+          </div>
+
+          <div class="shrink-0 grid grid-cols-2 gap-2.5 mt-2.5">
+            <div class="p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-xs font-bold text-sky-400"><i class="fa-solid fa-water mr-1"></i>Dark Zones = Standing Water</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Flat water bounces radar away like a mirror (<strong>&lt; -17.5 dB</strong>).</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-tree mr-1"></i>Bright Zones = Dry Soil &amp; Trees</div>
+              <p class="text-[11px] text-slate-300 mt-0.5">Rough ground bounces radar back through storm clouds.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Storytelling Panel (42%) -->
+        <div class="w-full lg:w-[42%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center">
+            <span class="self-start inline-block px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+              02 • Radar Physics Made Simple
+            </span>
+            <h2 class="text-lg sm:text-xl xl:text-2xl font-extrabold text-white leading-snug mb-2">
+              How NASA Radar Sees Water Underneath Storm Clouds.
+            </h2>
+            <p class="text-slate-300 text-xs leading-relaxed mb-2.5">
+              Instead of taking a regular camera photo, <strong>NASA's NISAR satellite</strong> sends invisible microwave pulses (<strong>24 cm L-band</strong>) through clouds and measures the echo (backscatter) that bounces back.
+            </p>
+
+            <div class="space-y-2">
+              <div class="stagger-1 p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-xs font-bold text-white mb-0.5">🪞 Physical Driver 1: Specular Reflection (Dark Water)</div>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Calm floodwater has a high dielectric constant and is smooth like a mirror. Radar waves bounce away from the satellite, creating sharp dark zones (<strong>&lt; -17.5 dB</strong>).</p>
+              </div>
+              <div class="stagger-2 p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-xs font-bold text-white mb-0.5">🌿 Physical Driver 2: Rough Dry Ground &amp; Vegetation</div>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Rough dry soil, trees, and buildings scatter radar energy back to space, appearing bright gray. Longer L-band waves even penetrate crop canopies.</p>
+              </div>
+              <div class="stagger-3 p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-xs font-bold text-white mb-0.5">🚤 Shallow Flood vs. Deep Boat-Only Currents</div>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Comparing <strong>Aug 19 (Before)</strong> and <strong>Aug 31 (Peak Flood)</strong> isolates <strong>35.86 km²</strong> of flooding and separates shallow farms from deep water where only boats can enter.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 3: TRAPPED VILLAGES & AUTO CRIMSON FLOOD ILLUMINATION         -->
+      <!-- =================================================================== -->
+      <section id="slide-3" class="slide w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left Interactive Satellite Map (58%) -->
+        <div class="w-full lg:w-[58%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl">
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-red-400">
+              <i class="fa-solid fa-satellite mr-1.5"></i> Satellite View • Hover Pins for Live Village &amp; Staging Intel
+            </span>
+            <button onclick="flyToKoshiZoom()" class="px-3 py-1 rounded-xl bg-[#1a253b] hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-sky-300 transition cursor-pointer">
+              <i class="fa-solid fa-magnifying-glass-plus mr-1"></i> Zoom to Gobargadha
+            </button>
+          </div>
+
+          <div class="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden border border-[#24324a]">
+            <div id="mapSlide3" class="w-full h-full z-0"></div>
+            <div id="mapHoverIndicator" class="absolute top-3 right-3 z-[500] px-3 py-1 rounded-xl bg-[#0b1120]/90 border border-slate-700 text-xs font-semibold text-slate-300 backdrop-blur-md transition-all">
+              <i class="fa-solid fa-satellite-dish mr-1 text-sky-400"></i> Scanning flood perimeter...
+            </div>
+          </div>
+
+          <!-- Legend Bar -->
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mt-2.5 px-3 py-2 rounded-xl bg-[#0b1120] border border-[#24324a] text-xs">
+            <span class="flex items-center gap-1.5 text-red-300 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-red-600 inline-block"></span> Flood Danger &amp; Trapped Villages</span>
+            <span class="flex items-center gap-1.5 text-amber-300 font-semibold"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> Rescue Vehicles &amp; Boat Drop-Off</span>
+            <span class="flex items-center gap-1.5 text-rose-400 font-semibold">--- 24 Submerged Roads</span>
+          </div>
+        </div>
+
+        <!-- Right Storytelling Panel (42%) -->
+        <div class="w-full lg:w-[42%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center">
+            <span class="self-start inline-block px-2.5 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+              03 • Priority Village &amp; Staging Detection
+            </span>
+            <h2 class="text-lg sm:text-xl xl:text-2xl font-extrabold text-white leading-snug mb-1.5">
+              Ranks Trapped Villages &amp; Marks Where Rescue Trucks Park.
+            </h2>
+            <p class="text-slate-300 text-xs leading-relaxed mb-2">
+              Combining NISAR flood zones with OpenStreetMap buildings ranks the <strong>Top 5 trapped villages by population</strong>. Hover over any map pin or click a village below:
+            </p>
+
+            <!-- Live Dynamic Hover Details Card -->
+            <div id="s3DynamicCard" class="p-2.5 rounded-xl bg-[#0b1120] border border-red-500/40 mb-2 transition-all">
+              <div class="flex items-center justify-between gap-2 mb-0.5">
+                <span id="s3CardTitle" class="text-xs sm:text-sm font-extrabold text-white">#1 Gobargadha Island Community</span>
+                <span id="s3CardBadge" class="px-2 py-0.5 rounded text-[10px] font-bold border bg-red-500/20 text-red-300 border-red-500/40">CRITICAL • ~3,992</span>
+              </div>
+              <p id="s3CardBody" class="text-[11px] text-slate-300 leading-snug">
+                Surrounding Flood: <strong>3.05 km²</strong>. Surrounded by deep river channels. Rescue trucks stop at the Amber Staging Point to launch motorboats.
+              </p>
+            </div>
+
+            <!-- Interactive Top 5 Villages List Restored -->
+            <div class="space-y-1 mb-2 text-[11px]">
+              <div onclick="focusVillageFromList(0)" class="px-2.5 py-1.5 rounded-lg bg-[#0b1120] hover:bg-slate-800 border border-[#24324a] flex items-center justify-between cursor-pointer transition">
+                <span class="font-bold text-red-300">1. Gobargadha Island Community</span>
+                <span class="text-slate-300 font-semibold">~3,992 people • 3.05 km²</span>
+              </div>
+              <div onclick="focusVillageFromList(1)" class="px-2.5 py-1.5 rounded-lg bg-[#0b1120] hover:bg-slate-800 border border-[#24324a] flex items-center justify-between cursor-pointer transition">
+                <span class="font-bold text-red-300">2. Tilathi Koiladi Floodplain</span>
+                <span class="text-slate-300 font-semibold">~4,768 people • 2.40 km²</span>
+              </div>
+              <div onclick="focusVillageFromList(2)" class="px-2.5 py-1.5 rounded-lg bg-[#0b1120] hover:bg-slate-800 border border-[#24324a] flex items-center justify-between cursor-pointer transition">
+                <span class="font-bold text-amber-300">3. Hanumannagar Sector • 4. Sakarpura • 5. Inarwa</span>
+                <span class="text-sky-300 font-semibold">Click to Inspect</span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Flooded Area</div>
+                <div class="text-xs sm:text-sm font-extrabold text-sky-400">26.3 km²</div>
+              </div>
+              <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Closed Roads</div>
+                <div class="text-xs sm:text-sm font-extrabold text-red-400">24 Sections</div>
+              </div>
+              <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Boat Drop-Off</div>
+                <div class="text-xs sm:text-sm font-extrabold text-amber-400">26.35°N, 86.65°E</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 4: AI RESCUE BASE SELECTION & SAFE DRY CORRIDOR               -->
+      <!-- =================================================================== -->
+      <section id="slide-4" class="slide w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left Safe Green Corridor Satellite Map (58%) -->
+        <div class="w-full lg:w-[58%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl">
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">
+              <i class="fa-solid fa-route mr-1.5"></i> Verified Safe Dry Corridor (7.73 km • ~13 Min Drive)
+            </span>
+            <button onclick="runSlide4CycleSequence()" class="px-3 py-1 rounded-xl bg-[#1a253b] hover:bg-slate-700 border border-slate-600 text-xs font-semibold text-emerald-300 transition cursor-pointer">
+              <i class="fa-solid fa-rotate mr-1"></i> Replay AI Ranking
+            </button>
+          </div>
+
+          <div class="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden border border-[#24324a]">
+            <div id="mapSlide4" class="w-full h-full z-0"></div>
+          </div>
+
+          <div class="shrink-0 grid grid-cols-3 gap-2.5 mt-2.5 text-center">
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-[10px] text-slate-400 uppercase">AI Top Base Score</div>
+              <div class="text-xs sm:text-sm font-extrabold text-emerald-400">86.8 / 100</div>
+            </div>
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-[10px] text-slate-400 uppercase">Dry Road Distance</div>
+              <div class="text-xs sm:text-sm font-extrabold text-white">7.73 km (~13 min)</div>
+            </div>
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-[10px] text-slate-400 uppercase">Staging Transfer</div>
+              <div class="text-xs sm:text-sm font-extrabold text-amber-400">Truck → Motorboat</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Storytelling & Candidate Base Flip Cards (42%) -->
+        <div class="w-full lg:w-[42%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center">
+            <span class="self-start inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+              04 • Multi-Criteria AI Dispatch Engine
+            </span>
+            <h2 class="text-lg sm:text-xl xl:text-2xl font-extrabold text-white leading-snug mb-1">
+              Which Rescue Base Should Respond? AI Ranks Every Option.
+            </h2>
+            <p class="text-slate-300 text-xs leading-relaxed mb-2">
+              Instead of guessing, our <strong>Multi-Criteria Decision Analysis (MCDA) AI model</strong> scores 5 safe rescue bases out of <strong>100</strong> and prunes all 24 flooded roads from the routing graph:
+            </p>
+
+            <!-- Restored AI Weight Breakdown Pills (45% / 35% / 20%) -->
+            <div class="grid grid-cols-3 gap-1.5 mb-2 text-center">
+              <div class="p-1.5 rounded-lg bg-[#0b1120] border border-emerald-500/30">
+                <div class="text-xs font-extrabold text-emerald-400">45% Weight</div>
+                <div class="text-[10px] text-slate-300">Fastest Dry Road</div>
+              </div>
+              <div class="p-1.5 rounded-lg bg-[#0b1120] border border-sky-500/30">
+                <div class="text-xs font-extrabold text-sky-400">35% Weight</div>
+                <div class="text-[10px] text-slate-300">Medical &amp; Boat Gear</div>
+              </div>
+              <div class="p-1.5 rounded-lg bg-[#0b1120] border border-amber-500/30">
+                <div class="text-xs font-extrabold text-amber-400">20% Weight</div>
+                <div class="text-[10px] text-slate-300">Route Flood Safety</div>
+              </div>
+            </div>
+
+            <p id="s4EvalStatusLabel" class="text-xs font-semibold text-sky-300 mb-2">
+              AI Rescue Base Ranking (Evaluating 3 Bases...)
+            </p>
+
+            <!-- 3 Candidate Base Cards (Cycle automatically with 1.8s hold each) -->
+            <div class="space-y-1.5">
+              <div id="baseCard0" onclick="clearSlideChoreography(); selectHubOnMap(0, true)" class="base-card-item p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a] cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-white">★ #1 Central Koshi High-Ground Medical Post</span>
+                  <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-extrabold">86.8 / 100</span>
+                </div>
+                <p class="text-[11px] text-slate-300 mt-0.5">7.73 km (~13 min dry drive) • Direct access to boat drop-off + triage clinic.</p>
+              </div>
+
+              <div id="baseCard1" onclick="clearSlideChoreography(); selectHubOnMap(1, true)" class="base-card-item p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a] cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-200">#2 Western Highway Logistics Depot</span>
+                  <span class="px-2 py-0.5 rounded bg-slate-800 text-sky-300 text-xs font-bold">84.8 / 100</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5">9.40 km (~16 min dry drive) • Heavy supply warehouse backup hub.</p>
+              </div>
+
+              <div id="baseCard2" onclick="clearSlideChoreography(); selectHubOnMap(2, true)" class="base-card-item p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a] cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-200">#3 Eastern Relief &amp; Boat Hub</span>
+                  <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs font-bold">71.2 / 100</span>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-0.5">12.10 km (~21 min dry drive) • Longer route near eastern flood seepage.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 5: PREDICTIVE FLOOD EXPANSION SIMULATOR (+0M TO +300M)        -->
+      <!-- =================================================================== -->
+      <section id="slide-5" class="slide w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left Predictive Simulation Map (58%) -->
+        <div class="w-full lg:w-[58%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl">
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-amber-400">
+              <i class="fa-solid fa-water-rise mr-1.5"></i> Predictive Flood Surge Simulator (+0m to +300m)
+            </span>
+            <span id="simBadge5" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40">
+              Current Water Level (+0m)
+            </span>
+          </div>
+
+          <div class="relative flex-1 min-h-0 w-full rounded-xl overflow-hidden border border-[#24324a]">
+            <div id="mapSlide5" class="w-full h-full z-0"></div>
+            <div id="relocateAlert5" class="hidden absolute bottom-3 left-3 right-3 z-[500] px-3.5 py-2 rounded-xl bg-amber-950/95 border border-amber-400 text-xs font-bold text-amber-200 shadow-lg backdrop-blur-md">
+              <i class="fa-solid fa-arrows-rotate mr-1.5 text-amber-400"></i> 🔄 Boat Drop-Off Automatically Relocated to Higher Dry Ground!
+            </div>
+          </div>
+
+          <!-- Interactive Slider Bar -->
+          <div class="shrink-0 mt-2.5 bg-[#0b1120] px-4 py-2 rounded-xl border border-[#24324a]">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="font-semibold text-slate-300">Predicted Flood Spread:</span>
+              <span id="simMetersText5" class="font-extrabold text-amber-400">+0 meters</span>
+            </div>
+            <input id="simSlider5" type="range" min="0" max="300" step="10" value="0" oninput="stopSimAutoAnim(); updateSatelliteSim(this.value)" class="w-full" />
+          </div>
+        </div>
+
+        <!-- Right Live Metrics & Explanation Panel (42%) -->
+        <div class="w-full lg:w-[42%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center">
+            <span class="self-start inline-block px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+              05 • Proactive Flood Surge Simulation
+            </span>
+            <h2 class="text-lg sm:text-xl xl:text-2xl font-extrabold text-white leading-snug mb-1.5">
+              What If Water Rises +250m? Our Map Adapts Before Convoys Trap.
+            </h2>
+            <p class="text-slate-300 text-xs leading-relaxed mb-2.5">
+              Floods are dynamic—water keeps spreading. Commanders can test rising floodwaters (<strong>+0m to +300m</strong>) in real time. When simulated water submerges the lower road, our algorithm automatically moves the boat drop-off point to higher dry ground.
+            </p>
+
+            <!-- Live Updating Metric Cards -->
+            <div class="grid grid-cols-2 gap-2 mb-2.5">
+              <div class="p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Predicted Flood Area</div>
+                <div id="simArea5" class="text-base font-extrabold text-sky-400">26.30 km²</div>
+                <div class="text-[10px] text-slate-400">Up to 326.88 km² at +250m</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Closed Road Sections</div>
+                <div id="simRoads5" class="text-base font-extrabold text-red-400">24 Sections</div>
+                <div class="text-[10px] text-slate-400">Up to 100 closed at +250m</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Boat Staging Status</div>
+                <div id="simStage5" class="text-xs sm:text-sm font-extrabold text-emerald-400">Original Safe</div>
+                <div class="text-[10px] text-slate-400">Auto-relocates at ≥ +100m</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+                <div class="text-[10px] text-slate-400 uppercase">Safe Truck Distance</div>
+                <div id="simDist5" class="text-base font-extrabold text-white">7.73 km</div>
+                <div class="text-[10px] text-slate-400">6.24 km (~10 min) relocated</div>
+              </div>
+            </div>
+
+            <div class="space-y-1.5 text-xs">
+              <div class="p-2 rounded-xl bg-[#0b1120] border-l-4 border-amber-500 text-slate-300">
+                <strong>🔄 Adaptive Staging Relocation:</strong> Moves boat launch coordinates from <code class="text-amber-300">26.3515°N</code> to higher dry ground (<code class="text-emerald-300">26.3645°N, 86.6490°E</code>).
+              </div>
+              <div class="p-2 rounded-xl bg-[#0b1120] border-l-4 border-sky-500 text-slate-300">
+                <strong>🛡️ Zero Ambush Risk:</strong> Prevents heavy relief trucks from driving into lowland roads that are about to flood.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 6: 3-DAY EMERGENCY SUPPLIES CALCULATOR (SPHERE STANDARDS)     -->
+      <!-- =================================================================== -->
+      <section id="slide-6" class="slide w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left 6 Supply Cargo Cards (58%) -->
+        <div class="w-full lg:w-[58%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl">
+          <div class="shrink-0 flex flex-wrap items-center justify-between gap-2 mb-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-sky-400">
+              <i class="fa-solid fa-boxes-stacked mr-1.5"></i> 72-Hour Emergency Relief Cargo (Sphere Standards)
+            </span>
+            <div class="flex items-center gap-1.5">
+              <button id="btnVillageA" onclick="switchSuppliesVillage('gobargadha')" class="px-3 py-1 rounded-xl bg-sky-500 text-slate-950 font-bold text-xs cursor-pointer">
+                Gobargadha (~3,992)
+              </button>
+              <button id="btnVillageB" onclick="switchSuppliesVillage('tilathi')" class="px-3 py-1 rounded-xl bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 font-bold text-xs cursor-pointer">
+                Tilathi Koiladi (~4,768)
+              </button>
+            </div>
+          </div>
+
+          <div class="flex-1 min-h-0 grid grid-cols-2 sm:grid-cols-3 gap-3 content-center">
+            <div class="p-3.5 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between">
+              <div class="text-xs font-bold text-sky-400"><i class="fa-solid fa-droplet mr-1"></i> CLEAN WATER</div>
+              <div id="supWater" class="text-xl sm:text-2xl font-extrabold text-white my-1">35,928 L</div>
+              <div class="text-[11px] text-slate-400">3 L / person / day × 3 days</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between">
+              <div class="text-xs font-bold text-emerald-400"><i class="fa-solid fa-utensils mr-1"></i> READY MEALS</div>
+              <div id="supMeals" class="text-xl sm:text-2xl font-extrabold text-white my-1">11,976</div>
+              <div class="text-[11px] text-slate-400">3 food packs / person / day</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between">
+              <div class="text-xs font-bold text-purple-400"><i class="fa-solid fa-tent mr-1"></i> FAMILY TENTS</div>
+              <div id="supTents" class="text-xl sm:text-2xl font-extrabold text-white my-1">799 Tents</div>
+              <div class="text-[11px] text-slate-400">1 waterproof tent per 5 people</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between">
+              <div class="text-xs font-bold text-amber-400"><i class="fa-solid fa-ship mr-1"></i> RESCUE BOATS</div>
+              <div id="supBoats" class="text-xl sm:text-2xl font-extrabold text-white my-1">16 Boats</div>
+              <div class="text-[11px] text-slate-400">Motorboats for deep flood zones</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between">
+              <div class="text-xs font-bold text-slate-200"><i class="fa-solid fa-truck mr-1"></i> SUPPLY TRUCKS</div>
+              <div id="supTrucks" class="text-xl sm:text-2xl font-extrabold text-white my-1">7 Trucks</div>
+              <div class="text-[11px] text-slate-400">8-ton cargo trucks on dry road</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between">
+              <div class="text-xs font-bold text-rose-400"><i class="fa-solid fa-kit-medical mr-1"></i> MEDICAL KITS</div>
+              <div id="supKits" class="text-xl sm:text-2xl font-extrabold text-white my-1">40 Kits</div>
+              <div class="text-[11px] text-slate-400">First-aid &amp; water purification</div>
+            </div>
+          </div>
+
+          <div class="shrink-0 mt-2.5 px-3 py-2 rounded-xl bg-[#0b1120] border border-[#24324a] text-xs text-slate-300 flex items-center justify-between">
+            <span><i class="fa-solid fa-scale-balanced text-sky-400 mr-1.5"></i> Calibrated to International Sphere Humanitarian Standards</span>
+            <span class="font-bold text-emerald-400">72-Hour Autonomous Survival</span>
+          </div>
+        </div>
+
+        <!-- Right Storytelling Panel (42%) -->
+        <div class="w-full lg:w-[42%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center">
+            <span class="self-start inline-block px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/30 text-sky-300 text-[11px] font-bold uppercase tracking-wider mb-1.5">
+              06 • Automated Humanitarian Logistics
+            </span>
+            <h2 class="text-lg sm:text-xl xl:text-2xl font-extrabold text-white leading-snug mb-2">
+              Turns Population Numbers Into Exact Truck &amp; Boat Loads.
+            </h2>
+            <p class="text-slate-300 text-xs leading-relaxed mb-2.5">
+              Knowing how many people are trapped is not enough—responders need to know <strong>how much water, food, and how many boats to load</strong>. Clicking any village switches the 72-hour cargo math automatically:
+            </p>
+
+            <div class="space-y-2">
+              <div class="stagger-1 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-sky-500">
+                <h3 class="text-xs font-bold text-sky-300 mb-0.5">💧 Clean Drinking Water &amp; Ready Meals (Sphere Standards)</h3>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Allocates <strong>3 liters of clean water</strong> and <strong>3 ready-to-eat meals per person per day</strong> for 3 days (e.g., <strong>42,912 L</strong> &amp; <strong>14,304 meals</strong> for Tilathi Koiladi).</p>
+              </div>
+              <div class="stagger-2 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-purple-500">
+                <h3 class="text-xs font-bold text-purple-300 mb-0.5">⛺ Shelter &amp; Medical Kits</h3>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Computes <strong>1 waterproof family tent per 5 residents</strong> plus emergency first-aid and water-purification tablet kits to prevent cholera outbreaks.</p>
+              </div>
+              <div class="stagger-3 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-amber-500">
+                <h3 class="text-xs font-bold text-amber-300 mb-0.5">🚛 Fleet Sizing (8-Ton Trucks + Rescue Motorboats)</h3>
+                <p class="text-[11.5px] text-slate-300 leading-snug">Matches dry-road 8-ton cargo trucks to last-mile motorboat shuttles waiting at the Boat Drop-Off point.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- =================================================================== -->
+      <!-- SLIDE 7: EXECUTIVE SUMMARY (CHALLENGE, SOLUTION, METHODOLOGY & KIT) -->
+      <!-- =================================================================== -->
+      <section id="slide-7" class="slide w-full h-full flex flex-col lg:flex-row gap-4 items-stretch">
+        <!-- Left Offline Kit & Impact Preview (54%) -->
+        <div class="w-full lg:w-[54%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-3.5 sm:p-4 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="shrink-0 flex items-center justify-between mb-1.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">
+              <i class="fa-solid fa-wifi mr-1"></i> Zero-Internet Field Responder Package
+            </span>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-400/40">
+              Works 100% Offline
+            </span>
+          </div>
+
+          <!-- Restored Story Explanation + Offline Field Device Preview -->
+          <div class="flex-1 min-h-0 p-3 rounded-xl bg-[#0b1120] border border-[#24324a] flex flex-col justify-between gap-2">
+            <div>
+              <div class="flex items-center justify-between border-b border-[#24324a] pb-1.5 mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-bold">NO CELL SIGNAL</span>
+                  <span class="text-xs font-bold text-white">Storms Knock Out Internet. Our Map Works Offline.</span>
+                </div>
+                <span class="text-[11px] text-emerald-400 font-semibold">● Ready on Phone</span>
+              </div>
+              <p class="text-[11px] text-slate-300 leading-snug">
+                During severe floods, cellular towers and Wi-Fi fail. Before leaving the base, field teams download 3 self-contained files that work completely offline on any phone, tablet, or truck GPS:
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left">
+              <div class="p-2 rounded-xl bg-[#131c2e] border border-[#24324a]">
+                <div class="text-xs font-bold text-amber-400 mb-0.5"><i class="fa-solid fa-map mr-1"></i>1. Offline Map (.html)</div>
+                <p class="text-[11px] text-slate-300 leading-snug">Standalone interactive map with flood zones, pins, and zoom—zero internet needed.</p>
+              </div>
+              <div class="p-2 rounded-xl bg-[#131c2e] border border-[#24324a]">
+                <div class="text-xs font-bold text-emerald-400 mb-0.5"><i class="fa-solid fa-location-dot mr-1"></i>2. GPS Route (.geojson)</div>
+                <p class="text-[11px] text-slate-300 leading-snug">Loads safe dry road coordinates (<code class="text-sky-300">26.3482, 86.6588</code>) into driver GPS apps.</p>
+              </div>
+              <div class="p-2 rounded-xl bg-[#131c2e] border border-[#24324a]">
+                <div class="text-xs font-bold text-sky-400 mb-0.5"><i class="fa-solid fa-file-lines mr-1"></i>3. Mission Sheet (.md)</div>
+                <p class="text-[11px] text-slate-300 leading-snug">Printable 1-page Situation Report (SitRep) with village stats &amp; 3-day cargo checklist.</p>
+              </div>
+            </div>
+
+            <!-- Interactive Download Preview Buttons -->
+            <div>
+              <div class="flex flex-wrap gap-2">
+                <button onclick="showOfflineReady('Offline Interactive Map (.html)')" class="flex-1 py-1.5 px-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition cursor-pointer">
+                  <i class="fa-solid fa-download mr-1"></i> Save Offline Map (.html)
+                </button>
+                <button onclick="showOfflineReady('Driver GPS Route (.geojson)')" class="flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer">
+                  <i class="fa-solid fa-route mr-1"></i> Export GPS (.geojson)
+                </button>
+                <button onclick="showOfflineReady('Mission SitRep (.md)')" class="flex-1 py-1.5 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer">
+                  <i class="fa-solid fa-clipboard-check mr-1"></i> Save Report (.md)
+                </button>
+              </div>
+              <div id="offlineToast7" class="hidden mt-1.5 text-center text-xs font-semibold text-emerald-300 bg-emerald-950/70 border border-emerald-500/40 py-1 rounded-lg"></div>
+            </div>
+          </div>
+
+          <!-- Impact Summary Numbers -->
+          <div class="shrink-0 grid grid-cols-3 gap-2.5 mt-2 text-center">
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-base font-extrabold text-sky-400">100%</div>
+              <div class="text-[10px] text-slate-300">Sees Through Storm Clouds</div>
+            </div>
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-base font-extrabold text-emerald-400">13 min</div>
+              <div class="text-[10px] text-slate-300">Verified Dry Rescue Corridor</div>
+            </div>
+            <div class="p-2 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-base font-extrabold text-amber-400">72 hrs</div>
+              <div class="text-[10px] text-slate-300">Supplies &amp; Offline Kit Ready</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Executive Summary Panel for Judges (46%) -->
+        <div class="w-full lg:w-[46%] h-full min-h-0 rounded-2xl bg-[#131c2e] border border-[#24324a] p-4 sm:p-5 flex flex-col justify-between shadow-xl overflow-y-auto">
+          <div class="min-h-0 flex flex-col justify-center gap-2">
+            <div class="flex items-center justify-between">
+              <span class="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 text-[11px] font-bold uppercase tracking-wider">
+                07 • Complete Mission &amp; Executive Summary
+              </span>
+              <span class="text-[11px] font-bold text-slate-400">Dancing with the SARs</span>
+            </div>
+
+            <!-- (a) The Challenge -->
+            <div class="stagger-1 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-red-500">
+              <div class="text-xs font-extrabold text-red-400 uppercase tracking-wide">
+                <i class="fa-solid fa-triangle-exclamation mr-1"></i> The Challenge
+              </div>
+              <p class="text-[11.5px] text-slate-200 leading-snug mt-0.5">
+                Monsoon storm clouds blind optical satellites for days during floods, while raw Synthetic Aperture Radar (SAR) imagery is too complex for field responders to turn into fast rescue routes and supply plans.
+              </p>
+            </div>
+
+            <!-- (b) Our Solution -->
+            <div class="stagger-2 p-2.5 rounded-xl bg-[#0b1120] border-l-4 border-emerald-500">
+              <div class="text-xs font-extrabold text-emerald-400 uppercase tracking-wide">
+                <i class="fa-solid fa-lightbulb mr-1"></i> Our Solution: Eye from Above
+              </div>
+              <p class="text-[11.5px] text-slate-200 leading-snug mt-0.5">
+                An end-to-end disaster intelligence platform that converts all-weather <strong>NASA NISAR L-Band radar</strong> into priority village rankings, AI-scored safe dry corridors, predictive flood simulations, and offline field kits.
+              </p>
+            </div>
+
+            <!-- (c) How We Solved It (4-Step Methodology + Key Features) -->
+            <div class="stagger-3 p-2.5 rounded-xl bg-[#0b1120] border border-[#24324a]">
+              <div class="text-xs font-extrabold text-sky-400 uppercase tracking-wide mb-1.5">
+                <i class="fa-solid fa-gears mr-1"></i> How We Solved It &amp; Core Features
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-slate-200">
+                <div class="p-1.5 rounded-lg bg-[#131c2e] border border-[#24324a]">
+                  <span class="font-bold text-sky-300">1. NISAR Radar Physics:</span> Compares Aug 19 vs. Aug 31 scans (&lt; -17.5 dB specular dark water) to map 35.86 km² of shallow &amp; deep boat-only water.
+                </div>
+                <div class="p-1.5 rounded-lg bg-[#131c2e] border border-[#24324a]">
+                  <span class="font-bold text-rose-300">2. Village &amp; Road Fusion:</span> Fuses OpenStreetMap to rank 5 trapped villages and prune 24 submerged roads from the routing graph.
+                </div>
+                <div class="p-1.5 rounded-lg bg-[#131c2e] border border-[#24324a]">
+                  <span class="font-bold text-emerald-300">3. MCDA AI &amp; +250m Sim:</span> Scores 5 rescue bases (top: 86.8/100) and auto-relocates the Boat Drop-Off point when water rises.
+                </div>
+                <div class="p-1.5 rounded-lg bg-[#131c2e] border border-[#24324a]">
+                  <span class="font-bold text-amber-300">4. Sphere &amp; Offline Kit:</span> Calculates 72h water/meals/tents/boats and exports <code>.html</code>, <code>.geojson</code>, and <code>.md</code> files for zero-internet teams.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- BOTTOM MANUAL NAVIGATION BAR (NO AUTO-PLAY BETWEEN SLIDES) -->
+  <footer class="shrink-0 w-full px-5 sm:px-8 py-2.5 bg-[#131c2e]/95 border-t border-[#24324a] flex flex-wrap items-center justify-between gap-3 z-30">
+    <button id="prevBtn" onclick="stepSlide(-1)" disabled class="px-4 py-1.5 rounded-xl bg-[#1a253b] hover:bg-slate-700 disabled:opacity-40 border border-slate-700 text-xs sm:text-sm font-bold text-white flex items-center gap-2 transition cursor-pointer">
+      <i class="fa-solid fa-chevron-left"></i> Previous
+    </button>
+
+    <!-- Slide Dots (1 to 7) -->
+    <div class="flex items-center gap-1.5 sm:gap-2">
+      <button onclick="goToSlide(1)" class="nav-dot w-7 h-7 rounded-xl font-extrabold text-xs bg-sky-500 text-slate-950 transition cursor-pointer">1</button>
+      <button onclick="goToSlide(2)" class="nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer">2</button>
+      <button onclick="goToSlide(3)" class="nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer">3</button>
+      <button onclick="goToSlide(4)" class="nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer">4</button>
+      <button onclick="goToSlide(5)" class="nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer">5</button>
+      <button onclick="goToSlide(6)" class="nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer">6</button>
+      <button onclick="goToSlide(7)" class="nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer">7</button>
+    </div>
+
+    <button id="nextBtn" onclick="stepSlide(1)" class="next-btn-pulse px-5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 border border-sky-300/60 text-xs sm:text-sm font-extrabold text-slate-950 flex items-center gap-2 transition cursor-pointer">
+      Next Slide <i class="fa-solid fa-chevron-right"></i>
+    </button>
+  </footer>
+
+  <script>
+    // =========================================================================
+    // 1. MANUAL SLIDE NAVIGATION CONTROLLER + INTERNAL CHOREOGRAPHY TIMERS
+    // =========================================================================
+    let currentSlide = 1;
+    const totalSlides = 7;
+
+    // Active animation handles so switching slides cleanly resets/cancels old timers
+    let activeTimers = [];
+    let activeRafs = [];
+
+    function clearSlideChoreography() {
+      activeTimers.forEach(id => clearTimeout(id));
+      activeTimers = [];
+      activeRafs.forEach(id => cancelAnimationFrame(id));
+      activeRafs = [];
+    }
+
+    function goToSlide(target) {
+      if (target < 1 || target > totalSlides || target === currentSlide) return;
+      const previous = currentSlide;
+      currentSlide = target;
+
+      clearSlideChoreography();
+
+      document.querySelectorAll('.slide').forEach((el, idx) => {
+        const slideNum = idx + 1;
+        el.classList.remove('active', 'prev-exit');
+        if (slideNum === currentSlide) {
+          el.classList.add('active');
+        } else if (slideNum === previous && target > previous) {
+          el.classList.add('prev-exit');
+        }
+      });
+
+      // Update Header Counter & Bottom Dots
+      document.getElementById('slideCounterBadge').textContent = `SLIDE ${currentSlide} / ${totalSlides}`;
+      document.querySelectorAll('.nav-dot').forEach((dot, idx) => {
+        if (idx + 1 === currentSlide) {
+          dot.className = 'nav-dot w-7 h-7 rounded-xl font-extrabold text-xs bg-sky-500 text-slate-950 transition cursor-pointer';
+        } else {
+          dot.className = 'nav-dot w-7 h-7 rounded-xl font-bold text-xs bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 transition cursor-pointer';
+        }
+      });
+
+      document.getElementById('prevBtn').disabled = (currentSlide === 1);
+      document.getElementById('nextBtn').disabled = (currentSlide === totalSlides);
+
+      // Refresh Leaflet Satellite Map sizes & trigger choreographed internal animations
+      setTimeout(() => {
+        if (currentSlide === 1) {
+          if (map1) map1.invalidateSize();
+          triggerSlide1Choreography();
+        }
+        if (currentSlide === 2) {
+          if (map2) map2.invalidateSize();
+          triggerSlide2Choreography();
+        }
+        if (currentSlide === 3) {
+          if (map3) {
+            map3.invalidateSize();
+            map3.flyTo([26.352, 86.662], 13, { duration: 1.3 });
+          }
+          triggerSlide3Choreography();
+        }
+        if (currentSlide === 4) {
+          if (map4) {
+            map4.invalidateSize();
+            map4.flyTo([26.365, 86.652], 12.5, { duration: 1.3 });
+          }
+          triggerSlide4Choreography();
+        }
+        if (currentSlide === 5) {
+          if (map5) {
+            map5.invalidateSize();
+            map5.flyTo([26.355, 86.658], 12.5, { duration: 1.3 });
+          }
+          triggerSlide5Choreography();
+        }
+      }, 180);
+    }
+
+    function stepSlide(delta) {
+      goToSlide(currentSlide + delta);
+    }
+
+    // Keyboard Left/Right Arrow Support (Manual Only)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight') stepSlide(1);
+      if (e.key === 'ArrowLeft') stepSlide(-1);
+    });
+
+    // =========================================================================
+    // 2. REAL ESRI SATELLITE VIEW MAPS (LEAFLET.JS)
+    // =========================================================================
+    const esriSatelliteUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    const esriAttr = 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics';
+
+    let map1, map2, map3, map4, map5;
+    let s3ShallowLayer, s3DeepLayer, s3ClosedRoadsLayer;
+    let s4RouteLine, s4HubMarker;
+    let s5SurgeCircle, s5ThreatRoad, s5DropOffMarker;
+
+    // Real Koshi River Basin Coordinates (Nepal)
+    const villages = [
+      { name: '#1 Gobargadha Island Community', coords: [26.3465, 86.6695], pop: '~3,992', flood: '3.05 km²', status: 'CRITICAL • ISOLATED', desc: 'Surrounded by deep river channels. Rescue trucks stop at the Amber Staging Point to launch motorboats.' },
+      { name: '#2 Tilathi Koiladi Floodplain', coords: [26.3350, 86.6450], pop: '~4,768', flood: '2.40 km²', status: 'CRITICAL • ISOLATED', desc: 'Southern access highway submerged. High priority for water and boat evacuation.' },
+      { name: '#3 Hanumannagar Sector', coords: [26.3720, 86.6780], pop: '~3,120', flood: '1.85 km²', status: 'HIGH RISK', desc: 'Eastern embankment seepage. Accessible via northern dry corridor.' },
+      { name: '#4 Sakarpura Agricultural Belt', coords: [26.3410, 86.6250], pop: '~2,450', flood: '1.42 km²', status: 'HIGH RISK', desc: 'Shallow agricultural flooding detected by NISAR L-band radar.' },
+      { name: '#5 Inarwa Riverbank Zone', coords: [26.3260, 86.6630], pop: '~1,890', flood: '1.15 km²', status: 'MODERATE RISK', desc: 'Monitoring rising water levels along river bend.' }
+    ];
+
+    const rescueBases = [
+      { name: '★ #1 Central Koshi High-Ground Medical Post', coords: [26.3880, 86.6420], score: '86.8 / 100', dist: '7.73 km (~13 min dry drive)' },
+      { name: '#2 Western Highway Logistics Depot', coords: [26.3790, 86.6150], score: '84.8 / 100', dist: '9.40 km (~16 min dry drive)' },
+      { name: '#3 Eastern Relief & Boat Hub', coords: [26.3950, 86.6720], score: '71.2 / 100', dist: '12.10 km (~21 min dry drive)' }
+    ];
+
+    const dropOffCoords = [26.3515, 86.6565];
+    const relocatedDropOffCoords = [26.3645, 86.6490];
+
+    function initAllSatelliteMaps() {
+      // --- SLIDE 1 MAP (Satellite backdrop under clouds) ---
+      if (document.getElementById('mapSlide1')) {
+        map1 = L.map('mapSlide1', { zoomControl: false, attributionControl: true }).setView([26.352, 86.662], 12);
+        L.tileLayer(esriSatelliteUrl, { attribution: esriAttr, maxZoom: 18 }).addTo(map1);
+
+        L.polygon([
+          [26.375, 86.682], [26.358, 86.662], [26.332, 86.652], [26.325, 86.675], [26.355, 86.692]
+        ], { color: '#38bdf8', weight: 1.5, fillColor: '#2563eb', fillOpacity: 0.45 }).addTo(map1);
+
+        L.circleMarker([26.3465, 86.6695], {
+          radius: 9, color: '#ffffff', weight: 2, fillColor: '#dc2626', fillOpacity: 0.95
+        }).bindTooltip('<strong>SOS: Gobargadha Island (~3,992 Trapped)</strong>', { permanent: true, direction: 'right', className: 'tactical-tooltip' }).addTo(map1);
+      }
+
+      // --- SLIDE 2 MAP (Static Esri World Imagery backdrop for Before/After SAR Comparison) ---
+      if (document.getElementById('mapSlide2')) {
+        map2 = L.map('mapSlide2', {
+          zoomControl: false,
+          attributionControl: true,
+          dragging: false,
+          scrollWheelZoom: false,
+          doubleClickZoom: false,
+          touchZoom: false,
+          boxZoom: false,
+          keyboard: false
+        }).setView([26.352, 86.662], 12);
+        L.tileLayer(esriSatelliteUrl, { attribution: esriAttr, maxZoom: 18 }).addTo(map2);
+      }
+
+      // Rescue Vehicles & Boat Drop-Off Staging Icon
+      const stagingIcon = L.divIcon({
+        className: 'pin-pulse-amber',
+        html: '<div style="width:22px;height:22px;border-radius:50%;background:#d97706;border:2.5px solid #ffffff;color:#0b1120;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(0,0,0,0.6);"><i class="fa-solid fa-truck-front"></i></div>',
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+
+      // --- SLIDE 3 MAP (Auto Red Illumination + Interactive Hover) ---
+      if (document.getElementById('mapSlide3')) {
+        map3 = L.map('mapSlide3', { zoomControl: true }).setView([26.352, 86.662], 12);
+        L.tileLayer(esriSatelliteUrl, { attribution: esriAttr, maxZoom: 18 }).addTo(map3);
+
+        // Shallow Flood Zone Polygon
+        s3ShallowLayer = L.polygon([
+          [26.382, 86.685], [26.365, 86.660], [26.348, 86.648], [26.325, 86.642],
+          [26.320, 86.678], [26.348, 86.688], [26.375, 86.696]
+        ], {
+          color: '#38bdf8', weight: 1.5, fillColor: '#38bdf8', fillOpacity: 0.22
+        }).addTo(map3);
+
+        // Deep Water / Danger Zone Polygon (Auto-illuminates vivid crimson red after 1.6s)
+        s3DeepLayer = L.polygon([
+          [26.376, 86.683], [26.356, 86.664], [26.334, 86.658], [26.330, 86.674], [26.358, 86.686]
+        ], {
+          color: '#2563eb', weight: 1.5, fillColor: '#1d4ed8', fillOpacity: 0.35
+        }).addTo(map3);
+
+        // 24 Submerged Closed Roads (Red Dashed)
+        s3ClosedRoadsLayer = L.polyline([
+          [[26.3515, 86.6565], [26.3465, 86.6695]],
+          [[26.3480, 86.6480], [26.3350, 86.6450]],
+          [[26.3620, 86.6650], [26.3720, 86.6780]]
+        ], {
+          color: '#dc2626', weight: 3, dashArray: '7, 7', opacity: 0.65
+        }).addTo(map3);
+
+        const stagingMarker = L.marker(dropOffCoords, { icon: stagingIcon }).addTo(map3);
+        stagingMarker.bindTooltip(
+          '<strong>🚛 Rescue Vehicles & Boat Launch Point</strong><br/>Trucks park here on dry ground & unload rescue boats.',
+          { direction: 'top', className: 'tactical-tooltip' }
+        );
+        stagingMarker.on('mouseover', () => {
+          updateSlide3Card(
+            '🚛 Rescue Vehicles & Boat Drop-Off Point',
+            'DRY ROAD EDGE • STAGING',
+            'bg-amber-500/20 text-amber-300 border-amber-500/40',
+            'Coordinates: <strong>26.3515° N, 86.6565° E</strong>. Rescue trucks and ambulances stop safely at this dry edge to launch motorboats toward trapped islands.'
+          );
+        });
+
+        // Add 5 Interactive Priority Villages
+        villages.forEach((v, idx) => {
+          const isCritical = idx < 2;
+          const pinHtml = isCritical
+            ? `<div class="pin-pulse-red"><div style="width:22px;height:22px;border-radius:50%;background:#dc2626;border:2px solid #fff;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;">${idx + 1}</div></div>`
+            : `<div style="width:20px;height:20px;border-radius:50%;background:#d97706;border:2px solid #fff;color:#0b1120;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;">${idx + 1}</div>`;
+
+          const vIcon = L.divIcon({ className: '', html: pinHtml, iconSize: [22, 22], iconAnchor: [11, 11] });
+          const marker = L.marker(v.coords, { icon: vIcon }).addTo(map3);
+          marker.bindTooltip(`<strong>${v.name}</strong><br/>At Risk: ${v.pop} people`, { direction: 'top', className: 'tactical-tooltip' });
+
+          marker.on('mouseover', () => {
+            updateSlide3Card(
+              v.name,
+              `${v.status} • ${v.pop}`,
+              isCritical ? 'bg-red-500/20 text-red-300 border-red-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+              `Surrounding Flood: <strong>${v.flood}</strong>. ${v.desc}`
+            );
+          });
+          marker.on('click', () => {
+            map3.flyTo(v.coords, 14, { duration: 1.1 });
+          });
+        });
+      }
+
+      // --- SLIDE 4 MAP (AI Safe Green Corridor on Satellite) ---
+      if (document.getElementById('mapSlide4')) {
+        map4 = L.map('mapSlide4', { zoomControl: true }).setView([26.365, 86.652], 12);
+        L.tileLayer(esriSatelliteUrl, { attribution: esriAttr, maxZoom: 18 }).addTo(map4);
+
+        L.polygon([
+          [26.375, 86.682], [26.356, 86.664], [26.334, 86.658], [26.330, 86.678], [26.358, 86.690]
+        ], { color: '#2563eb', weight: 1.5, fillColor: '#1d4ed8', fillOpacity: 0.45 }).addTo(map4);
+
+        // Blocked Red Road Segment
+        L.polyline([dropOffCoords, [26.3465, 86.6695]], {
+          color: '#dc2626', weight: 4, dashArray: '6, 6'
+        }).bindTooltip('✕ Flooded Road Blocked to Vehicles', { direction: 'bottom', className: 'tactical-tooltip' }).addTo(map4);
+
+        // Safe Green Route Line
+        const safeCoords = [
+          [26.3880, 86.6420],
+          [26.3780, 86.6455],
+          [26.3645, 86.6490],
+          [26.3565, 86.6530],
+          dropOffCoords
+        ];
+        s4RouteLine = L.polyline(safeCoords, {
+          color: '#16a34a', weight: 6, opacity: 0.95
+        }).bindTooltip('<strong>Verified Safe Dry Road</strong><br/>7.73 km • ~13 min drive', { sticky: true, className: 'tactical-tooltip' }).addTo(map4);
+
+        // Rescue Base Marker
+        const baseIcon = L.divIcon({
+          className: '',
+          html: '<div style="width:24px;height:24px;border-radius:50%;background:#16a34a;border:2.5px solid #fff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;"><i class="fa-solid fa-hospital"></i></div>',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12]
+        });
+        s4HubMarker = L.marker(rescueBases[0].coords, { icon: baseIcon }).addTo(map4)
+          .bindTooltip('<strong>★ #1 Central Koshi Medical Post</strong><br/>AI Score: 86.8 / 100', { permanent: true, direction: 'right', className: 'tactical-tooltip' });
+
+        L.marker(dropOffCoords, { icon: stagingIcon }).addTo(map4)
+          .bindTooltip('<strong>🚤 Boat Drop-Off Point</strong><br/>End of dry truck road', { direction: 'left', className: 'tactical-tooltip' });
+      }
+
+      // --- SLIDE 5 MAP (Predictive +0m to +300m Flood Simulator) ---
+      if (document.getElementById('mapSlide5')) {
+        map5 = L.map('mapSlide5', { zoomControl: true }).setView([26.355, 86.658], 12);
+        L.tileLayer(esriSatelliteUrl, { attribution: esriAttr, maxZoom: 18 }).addTo(map5);
+
+        // Expanding Surge Circle
+        s5SurgeCircle = L.circle([26.3465, 86.6695], {
+          radius: 650,
+          color: '#d97706',
+          weight: 2,
+          dashArray: '5, 5',
+          fillColor: '#d97706',
+          fillOpacity: 0.25
+        }).addTo(map5);
+
+        // Baseline Blue Water
+        L.circle([26.3465, 86.6695], {
+          radius: 600,
+          color: '#2563eb',
+          weight: 1.5,
+          fillColor: '#2563eb',
+          fillOpacity: 0.55
+        }).addTo(map5);
+
+        // Upper Always-Safe Road
+        L.polyline([[26.3880, 86.6420], [26.3645, 86.6490]], {
+          color: '#16a34a', weight: 5
+        }).addTo(map5);
+
+        // Lower Threatened Road Segment
+        s5ThreatRoad = L.polyline([[26.3645, 86.6490], dropOffCoords], {
+          color: '#16a34a', weight: 5
+        }).addTo(map5);
+
+        // Adaptive Boat Drop-Off Marker
+        s5DropOffMarker = L.marker(dropOffCoords, { icon: stagingIcon }).addTo(map5);
+        s5DropOffMarker.bindTooltip('<strong>🚤 Boat Drop-Off Staging</strong>', { permanent: true, direction: 'right', className: 'tactical-tooltip' });
+      }
+    }
+
+    // --- SLIDE 1: Storm Clouds Dissipation Control ---
+    let s1CloudsLockedOpen = false;
+
+    function setSlide1CloudsVisible(visible) {
+      const cloudsEl = document.getElementById('stormCloudsOverlay');
+      const blindCard = document.getElementById('opticalBlindCard');
+      const piercedBadge = document.getElementById('radarPiercedBadge');
+      const btnSpan = document.querySelector('#cloudPeekBtn span');
+      if (!cloudsEl || !blindCard || !piercedBadge) return;
+
+      if (visible) {
+        cloudsEl.style.opacity = '1';
+        blindCard.style.opacity = '1';
+        piercedBadge.style.opacity = '0';
+        if (btnSpan) btnSpan.textContent = 'Peek Under Storm Clouds';
+      } else {
+        cloudsEl.style.opacity = '0';
+        blindCard.style.opacity = '0';
+        piercedBadge.style.opacity = '1';
+        if (btnSpan) btnSpan.textContent = 'Restore Storm Clouds';
+      }
+    }
+
+    function triggerSlide1Choreography() {
+      s1CloudsLockedOpen = false;
+      setSlide1CloudsVisible(true);
+      const t1 = setTimeout(() => {
+        s1CloudsLockedOpen = true;
+        setSlide1CloudsVisible(false);
+      }, 2700);
+      activeTimers.push(t1);
+    }
+
+    function peekCloudsHover(isHovering) {
+      if (s1CloudsLockedOpen) return;
+      setSlide1CloudsVisible(!isHovering);
+    }
+
+    function toggleSlide1Clouds() {
+      s1CloudsLockedOpen = !s1CloudsLockedOpen;
+      setSlide1CloudsVisible(!s1CloudsLockedOpen);
+    }
+
+    // --- SLIDE 2: Before/After Radar Divider auto-sweeps after 2.7s ---
+    let radarAutoStopped = false;
+
+    function stopRadarAutoAnim() {
+      radarAutoStopped = true;
+    }
+
+    function moveRadarDivider(val) {
+      const pct = Math.max(5, Math.min(95, parseFloat(val)));
+      const clipLayer = document.getElementById('radarClipLayer');
+      const handleBar = document.getElementById('radarHandleBar');
+      const rangeInput = document.getElementById('radarRangeInput');
+
+      if (clipLayer) clipLayer.style.width = `${pct}%`;
+      if (handleBar) handleBar.style.left = `${pct}%`;
+      if (rangeInput && document.activeElement !== rangeInput) {
+        rangeInput.value = Math.round(pct);
+      }
+    }
+
+    function triggerSlide2Choreography() {
+      radarAutoStopped = false;
+      moveRadarDivider(82);
+
+      const t2 = setTimeout(() => {
+        if (radarAutoStopped || currentSlide !== 2) return;
+        const startVal = 82;
+        const endVal = 18;
+        const duration = 3200;
+        const startTime = performance.now();
+
+        function animateSweep(now) {
+          if (radarAutoStopped || currentSlide !== 2) return;
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 2.6);
+          const currentPos = startVal + (endVal - startVal) * ease;
+          moveRadarDivider(currentPos);
+          if (progress < 1) {
+            const raf = requestAnimationFrame(animateSweep);
+            activeRafs.push(raf);
+          }
+        }
+        const raf = requestAnimationFrame(animateSweep);
+        activeRafs.push(raf);
+      }, 2700);
+      activeTimers.push(t2);
+    }
+
+    // --- SLIDE 3: Flood & Danger Zones auto-illuminate vivid red after 1.6s ---
+    function triggerSlide3Choreography() {
+      illuminateSlide3Map(false);
+      const t3 = setTimeout(() => {
+        if (currentSlide === 3) {
+          illuminateSlide3Map(true);
+        }
+      }, 1600);
+      activeTimers.push(t3);
+    }
+
+    function illuminateSlide3Map(active) {
+      const pill = document.getElementById('mapHoverIndicator');
+      if (!s3ShallowLayer || !s3DeepLayer || !s3ClosedRoadsLayer) return;
+      if (active) {
+        s3ShallowLayer.setStyle({ fillOpacity: 0.44, weight: 2.5, color: '#f87171', fillColor: '#ef4444' });
+        s3DeepLayer.setStyle({ fillOpacity: 0.78, weight: 3.5, color: '#dc2626', fillColor: '#b91c1c' });
+        s3ClosedRoadsLayer.setStyle({ weight: 6, opacity: 1, color: '#ef4444' });
+        pill.innerHTML = '<i class="fa-solid fa-radiation mr-1 text-red-400"></i> Flood Danger Zones Illuminated';
+        pill.className = 'absolute top-3 right-3 z-[500] px-3 py-1 rounded-xl bg-red-950/95 border border-red-500/80 text-xs font-bold text-red-200 backdrop-blur-md transition-all';
+      } else {
+        s3ShallowLayer.setStyle({ fillOpacity: 0.22, weight: 1.5, color: '#38bdf8', fillColor: '#38bdf8' });
+        s3DeepLayer.setStyle({ fillOpacity: 0.35, weight: 1.5, color: '#2563eb', fillColor: '#1d4ed8' });
+        s3ClosedRoadsLayer.setStyle({ weight: 3, opacity: 0.65, color: '#dc2626' });
+        pill.innerHTML = '<i class="fa-solid fa-satellite-dish mr-1 text-sky-400"></i> Scanning flood perimeter...';
+        pill.className = 'absolute top-3 right-3 z-[500] px-3 py-1 rounded-xl bg-[#0b1120]/90 border border-slate-700 text-xs font-semibold text-slate-300 backdrop-blur-md transition-all';
+      }
+    }
+
+    function updateSlide3Card(title, badge, badgeClass, bodyHtml) {
+      document.getElementById('s3CardTitle').textContent = title;
+      const b = document.getElementById('s3CardBadge');
+      b.textContent = badge;
+      b.className = `px-2 py-0.5 rounded text-[10px] font-bold border ${badgeClass}`;
+      document.getElementById('s3CardBody').innerHTML = bodyHtml;
+    }
+
+    function flyToKoshiZoom() {
+      if (map3) map3.flyTo([26.349, 86.663], 13.5, { duration: 1.2 });
+    }
+
+    function focusVillageFromList(idx) {
+      const v = villages[idx];
+      if (!v) return;
+      const isCritical = idx < 2;
+      updateSlide3Card(
+        v.name,
+        `${v.status} • ${v.pop}`,
+        isCritical ? 'bg-red-500/20 text-red-300 border-red-500/40' : 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+        `Surrounding Flood: <strong>${v.flood}</strong>. ${v.desc}`
+      );
+      if (map3) map3.flyTo(v.coords, 13.8, { duration: 1.0 });
+    }
+
+    // --- SLIDE 4: 3 Rescue Bases auto-cycle/flip after 1.6s and lock onto #1 AI Top Pick ---
+    function resetSlide4Cards() {
+      [0, 1, 2].forEach(i => {
+        const card = document.getElementById(`baseCard${i}`);
+        if (card) card.classList.remove('base-card-evaluating', 'base-card-winner');
+      });
+    }
+
+    function selectHubOnMap(idx, isFinalWinner = true) {
+      const hub = rescueBases[idx];
+      if (!map4 || !s4HubMarker || !s4RouteLine) return;
+
+      resetSlide4Cards();
+      const card = document.getElementById(`baseCard${idx}`);
+      if (card) {
+        card.classList.add(isFinalWinner ? 'base-card-winner' : 'base-card-evaluating');
+      }
+
+      map4.flyTo(hub.coords, 12.8, { duration: 0.85 });
+      s4HubMarker.setLatLng(hub.coords);
+      s4HubMarker.setTooltipContent(`<strong>${hub.name}</strong><br/>AI Score: ${hub.score} • ${hub.dist}`);
+      s4RouteLine.setLatLngs([hub.coords, [26.3645, 86.6490], dropOffCoords]);
+      s4RouteLine.setStyle({
+        color: isFinalWinner ? '#16a34a' : '#38bdf8',
+        weight: isFinalWinner ? 7 : 5
+      });
+    }
+
+    function triggerSlide4Choreography() {
+      resetSlide4Cards();
+      const statusLabel = document.getElementById('s4EvalStatusLabel');
+      if (statusLabel) statusLabel.textContent = 'AI Rescue Base Ranking (Evaluating 3 Bases...)';
+
+      // Step 1 (1.6s): Evaluate #3 Eastern Relief Hub (71.2) — holds for 1.8s
+      const t4a = setTimeout(() => {
+        if (currentSlide !== 4) return;
+        if (statusLabel) statusLabel.textContent = 'Checking Base #3: Eastern Hub (71.2/100)...';
+        selectHubOnMap(2, false);
+      }, 1600);
+
+      // Step 2 (3.4s): Evaluate #2 Western Highway Depot (84.8) — holds for 1.8s
+      const t4b = setTimeout(() => {
+        if (currentSlide !== 4) return;
+        if (statusLabel) statusLabel.textContent = 'Checking Base #2: Western Depot (84.8/100)...';
+        selectHubOnMap(1, false);
+      }, 3400);
+
+      // Step 3 (5.2s): Lock onto #1 Winner Central Koshi Medical Post (86.8)
+      const t4c = setTimeout(() => {
+        if (currentSlide !== 4) return;
+        if (statusLabel) statusLabel.textContent = 'AI Top Pick Locked: Central Koshi Medical Post (86.8/100)';
+        selectHubOnMap(0, true);
+      }, 5200);
+
+      activeTimers.push(t4a, t4b, t4c);
+    }
+
+    function runSlide4CycleSequence() {
+      clearSlideChoreography();
+      triggerSlide4Choreography();
+    }
+
+    // --- SLIDE 5: Predictive Flood Slider auto-advances (+0m -> +150m -> +250m) after 1.6s ---
+    let simAutoStopped = false;
+    function stopSimAutoAnim() {
+      simAutoStopped = true;
+    }
+
+    function triggerSlide5Choreography() {
+      simAutoStopped = false;
+      updateSatelliteSim(0);
+
+      const t5 = setTimeout(() => {
+        if (simAutoStopped || currentSlide !== 5) return;
+        const startMeters = 0;
+        const targetMeters = 250;
+        const duration = 4500;
+        const startTime = performance.now();
+
+        function animateFloodSpread(now) {
+          if (simAutoStopped || currentSlide !== 5) return;
+          const elapsed = now - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const ease = progress < 0.5
+            ? 2 * progress * progress
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+          const currentMeters = Math.round(startMeters + (targetMeters - startMeters) * ease);
+          updateSatelliteSim(currentMeters);
+
+          if (progress < 1) {
+            const raf = requestAnimationFrame(animateFloodSpread);
+            activeRafs.push(raf);
+          }
+        }
+        const raf = requestAnimationFrame(animateFloodSpread);
+        activeRafs.push(raf);
+      }, 1600);
+
+      activeTimers.push(t5);
+    }
+
+    function updateSatelliteSim(meters) {
+      const m = parseInt(meters, 10);
+      const sliderEl = document.getElementById('simSlider5');
+      if (sliderEl) sliderEl.value = m;
+
+      document.getElementById('simMetersText5').textContent = `+${m} meters`;
+
+      const area = (26.30 + m * 1.20232).toFixed(2);
+      const roads = Math.round(24 + (m / 250) * 76);
+      document.getElementById('simArea5').textContent = `${area} km²`;
+      document.getElementById('simRoads5').textContent = `${roads} Sections`;
+
+      if (s5SurgeCircle) {
+        s5SurgeCircle.setRadius(650 + m * 6.5);
+      }
+
+      const alertBox = document.getElementById('relocateAlert5');
+      const badge = document.getElementById('simBadge5');
+      const stageText = document.getElementById('simStage5');
+      const distText = document.getElementById('simDist5');
+
+      if (m >= 100) {
+        if (s5ThreatRoad) s5ThreatRoad.setStyle({ color: '#dc2626', dashArray: '6, 6' });
+        if (s5DropOffMarker) {
+          s5DropOffMarker.setLatLng(relocatedDropOffCoords);
+          s5DropOffMarker.setTooltipContent('<strong>🔄 Relocated Safe Boat Staging</strong><br/>Moved to higher dry ground');
+        }
+        alertBox.classList.remove('hidden');
+        badge.textContent = `Surge Test (+${m}m)`;
+        badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-400/50';
+        stageText.textContent = 'Relocated Safe';
+        stageText.className = 'text-xs sm:text-sm font-extrabold text-amber-400';
+        distText.textContent = '6.24 km';
+      } else {
+        if (s5ThreatRoad) s5ThreatRoad.setStyle({ color: '#16a34a', dashArray: null });
+        if (s5DropOffMarker) {
+          s5DropOffMarker.setLatLng(dropOffCoords);
+          s5DropOffMarker.setTooltipContent('<strong>🚤 Boat Drop-Off Staging</strong>');
+        }
+        alertBox.classList.add('hidden');
+        badge.textContent = m === 0 ? 'Current Water Level (+0m)' : `Minor Rise (+${m}m)`;
+        badge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-400/40';
+        stageText.textContent = 'Original Safe';
+        stageText.className = 'text-xs sm:text-sm font-extrabold text-emerald-400';
+        distText.textContent = '7.73 km';
+      }
+    }
+
+    // Slide 6: Switch Village Supplies
+    function switchSuppliesVillage(key) {
+      const btnA = document.getElementById('btnVillageA');
+      const btnB = document.getElementById('btnVillageB');
+      if (key === 'tilathi') {
+        btnB.className = 'px-3 py-1 rounded-xl bg-amber-500 text-slate-950 font-bold text-xs cursor-pointer';
+        btnA.className = 'px-3 py-1 rounded-xl bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 font-bold text-xs cursor-pointer';
+        document.getElementById('supWater').textContent = '42,912 L';
+        document.getElementById('supMeals').textContent = '14,304';
+        document.getElementById('supTents').textContent = '954 Tents';
+        document.getElementById('supBoats').textContent = '20 Boats';
+        document.getElementById('supTrucks').textContent = '9 Trucks';
+        document.getElementById('supKits').textContent = '48 Kits';
+      } else {
+        btnA.className = 'px-3 py-1 rounded-xl bg-sky-500 text-slate-950 font-bold text-xs cursor-pointer';
+        btnB.className = 'px-3 py-1 rounded-xl bg-[#0b1120] text-slate-300 border border-[#24324a] hover:border-slate-500 font-bold text-xs cursor-pointer';
+        document.getElementById('supWater').textContent = '35,928 L';
+        document.getElementById('supMeals').textContent = '11,976';
+        document.getElementById('supTents').textContent = '799 Tents';
+        document.getElementById('supBoats').textContent = '16 Boats';
+        document.getElementById('supTrucks').textContent = '7 Trucks';
+        document.getElementById('supKits').textContent = '40 Kits';
+      }
+    }
+
+    // Slide 7: Offline Ready Feedback
+    function showOfflineReady(label) {
+      const toast = document.getElementById('offlineToast7');
+      toast.textContent = `✅ Packaged: ${label} is ready for zero-internet field responders.`;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3200);
+    }
+
+    // Initialize Maps & Start Slide 1 Choreography on Window Load
+    window.addEventListener('load', () => {
+      try {
+        initAllSatelliteMaps();
+        triggerSlide1Choreography();
+      } catch (err) {
+        console.error('Initialization recovery:', err);
+      }
+    });
+  </script>
+</body>
+</html>
